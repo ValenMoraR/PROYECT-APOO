@@ -1,16 +1,14 @@
-from cancion import Cancion
+from cancion import *
 import tkinter as tk
-from tkinter import simpledialog
+from tkinter import simpledialog, PhotoImage
 import pygame
 from pygame import mixer
 import random
 import threading 
 import json
-import os
 
 pygame.init()
 mixer.init()
-
 class Reproductor:
     def __init__(self, ventana):
         self.ventana = ventana
@@ -29,21 +27,19 @@ class Reproductor:
 
         # Crear elementos de la interfaz gráfica
         self.ventana.title("Reproductor de Audio")
-        self.icono = tk.PhotoImage(file="icono.png")  # Reemplaza "icono.png" con tu icono
+        self.icono = tk.PhotoImage(file="icono.png") 
         self.ventana.tk.call('wm', 'iconphoto', self.ventana._w, self.icono)
 
-        # Sección para añadir listas de reproducción (background morado)
+        # Sección para añadir listas de reproducción
         self.playlist_frame = tk.Frame(self.ventana, bg="purple")
         self.playlist_frame.place(x=0,width=800, height=200)
-        # self.playlist_frame.pack(expand=True)
 
         # Agregar botones para las listas de reproducción
         self.crear_botones_listas()
 
-        # Sección para controlar el audio (background gris oscuro)
+        # Sección para controlar el audio (background gris)
         controls_frame = tk.Frame(self.ventana, bg="darkgray")
-        controls_frame.place(x=0,y=150,width=800, height=200)
-        # controls_frame.pack(fill="x")
+        controls_frame.place(x=0,y=150,width=800, height=150)
 
         # Botones para controlar el audio (organizados horizontalmente)
         self.pause_button = tk.Button(controls_frame, text="Pause",  command=self.pausar)
@@ -65,31 +61,41 @@ class Reproductor:
         lista_canciones = self.listas_de_reproduccion.get(nombre_lista, [])
         nueva_ventana = tk.Toplevel(self.ventana)  # Crea una nueva ventana
         nueva_ventana.title(nombre_lista)
+        nueva_ventana.geometry("300x300")
+        nueva_ventana.resizable(width=0, height=0)
+        
+            # Crea un Frame con fondo purpura
+        nueva_ventana_frame = tk.Frame(nueva_ventana, bg="purple")
+        nueva_ventana_frame.pack(fill="both", expand=True)  # Rellenar todo el espacio del Frame
 
         # Botón "Regresar" en la parte superior izquierda
-        regresar_button = tk.Button(nueva_ventana, text="Regresar", command=nueva_ventana.destroy)
+        regresar_button = tk.Button(nueva_ventana_frame, text="Regresar", command=nueva_ventana.destroy)
         regresar_button.grid(row=0, column=0, padx=10, pady=10, sticky="nw")
 
         # Botones de canciones en la nueva ventana
         for i, cancion in enumerate(lista_canciones):
-            cancion_button = tk.Button(nueva_ventana, text=cancion.nombre, command=lambda c=cancion: self.reproducir_cancion(c))
+            cancion_button = tk.Button(nueva_ventana_frame, text=cancion.nombre, command=lambda c=cancion: self.reproducir_cancion(c))
             cancion_button.grid(row=i + 1, column=0, padx=10, pady=5, sticky="w")
 
         # Botón "Reproducir" para todas las canciones en orden aleatorio
-        reproducir_button = tk.Button(nueva_ventana, text="Reproducir esta Playlist", command=lambda lc=lista_canciones: self.reproducir_aleatoriamente(lc))
+        reproducir_button = tk.Button(nueva_ventana_frame, text="Reproducir esta Playlist", command=lambda lc=lista_canciones: self.reproducir_aleatoriamente(lc))
         reproducir_button.grid(row=len(lista_canciones) + 1, column=0, padx=10, pady=10, sticky="w")
 
-         # Actualizar la lista activa al mostrar una lista de reproducción
+        # Actualizar la lista activa al mostrar una lista de reproducción
         self.lista_activa = self.listas_de_reproduccion.get(nombre_lista, [])
 
     # Métodos de Reproductor
     def reproducir_cancion(self, cancion):
         # Lógica para reproducir una canción
-        if cancion:
-            self.cancion_actual = cancion
-            mixer.music.load(cancion.archivo)
-            mixer.music.play()
-            print(self.cancion_actual.nombre)
+        try:
+            # Lógica para reproducir una canción
+            if cancion:
+                self.cancion_actual = cancion
+                mixer.music.load(cancion.archivo)
+                mixer.music.play()
+                print(self.cancion_actual.nombre)
+        except pygame.error as e:
+            print(f"Error al reproducir la canción: {e}")
 
     def pausar(self):
         # Lógica para pausar la canción
@@ -111,32 +117,39 @@ class Reproductor:
 
     def agregar_a_favoritos(self):
         if self.cancion_actual:
-            # Marcar o desmarcar la canción como favorita
-            self.cancion_actual.es_favorita = not self.cancion_actual.es_favorita
-            self.mostrar_favoritos()
-            self.guardar_favoritos()
-
+            # Comprueba si la canción ya está en la lista de favoritos
+            if self.cancion_actual in self.listas_de_reproduccion["Favoritos"]:
+                print(f"{self.cancion_actual.nombre} ya está en la lista de favoritos")
+            else:
+                # Marcar o desmarcar la canción como favorita
+                self.cancion_actual.es_favorita = not self.cancion_actual.es_favorita
+                self.mostrar_favoritos()
+                self.guardar_favoritos()
+                
     def reproducir_aleatoriamente(self, lista_canciones):
         if lista_canciones:
+            try:
             # Detener la canción actual si se está reproduciendo
-            pygame.mixer.music.stop()
+                pygame.mixer.music.stop()
 
-            # Reproducir las canciones en un orden aleatorio en un hilo separado
-            def reproducir_hilo():
-                canciones_aleatorias = lista_canciones.copy()
-                random.shuffle(canciones_aleatorias)
+                # Reproducir las canciones en un orden aleatorio en un hilo separado
+                def reproducir_hilo():
+                    canciones_aleatorias = lista_canciones.copy()
+                    random.shuffle(canciones_aleatorias)
 
-                for cancion in canciones_aleatorias:
-                    mixer.music.load(cancion.archivo)
-                    mixer.music.play()
-                    print(cancion.nombre)
-                    self.cancion_actual = cancion
-                    while mixer.music.get_busy():
-                        pygame.time.Clock().tick(10)  # Evitar bloquear la GUI
+                    for cancion in canciones_aleatorias:
+                        mixer.music.load(cancion.archivo)
+                        mixer.music.play()
+                        print(cancion.nombre)
+                        self.cancion_actual = cancion
+                        while mixer.music.get_busy():
+                            pygame.time.Clock().tick(10)  # Evitar bloquear la GUI
 
-            # Crea un hilo para reproducir la música
-            hilo = threading.Thread(target=reproducir_hilo)
-            hilo.start()
+                # Crea un hilo para reproducir la música
+                hilo = threading.Thread(target=reproducir_hilo)
+                hilo.start()
+            except pygame.error as e:
+                print(f"Error al reproducir aleatoriamente: {e}")
 
     def siguiente_cancion(self):
         if self.lista_activa:
@@ -154,21 +167,18 @@ class Reproductor:
             print(self.cancion_actual.nombre)
 
     def cargar_favoritos(self):
-        if os.path.exists("favoritos.json"):
-            with open("favoritos.json", "r") as archivo:
-                try:
-                    datos_favoritos = json.load(archivo)
-                    self.listas_de_reproduccion["Favoritos"] = [Cancion(cancion["nombre"], cancion["archivo"]) for cancion in datos_favoritos]
-                except json.JSONDecodeError:
-                    print("Error al decodificar el archivo JSON 'favoritos.json'. El archivo puede estar vacío o tener un formato incorrecto.")
-        else:
-            # Si el archivo no existe, crea una lista vacía de favoritos
-            self.listas_de_reproduccion["Favoritos"] = []
-
+        self.listas_de_reproduccion["Favoritos"] = []
+        
+        
     def guardar_favoritos(self):
-        with open("favoritos.json", "w") as archivo:
-            datos_favoritos = [{"nombre": cancion.nombre, "archivo": cancion.archivo} for cancion in self.listas_de_reproduccion["Favoritos"]]
-            json.dump(datos_favoritos, archivo)
+        try:
+            with open("favoritos.json", "w") as archivo:
+                datos_favoritos = [{"nombre": cancion.nombre, "archivo": cancion.archivo} for cancion in self.listas_de_reproduccion["Favoritos"]]
+                json.dump(datos_favoritos, archivo)
+        except json.JSONDecodeError as e:
+            print(f"Error al guardar los favoritos: {e}")
+        except FileNotFoundError:
+            print("El archivo 'favoritos.json' no se encontró.")
 
     def crear_botones_listas(self):
         # Borra los botones existentes de listas de reproducción
@@ -183,9 +193,8 @@ class Reproductor:
     def crear_lista_personalizada(self):
         nombre_lista = simpledialog.askstring("Crear Lista", "Ingresa el nombre de la nueva lista de reproducción:")
         if nombre_lista:
-            self.listas_de_reproduccion[nombre_lista] = []
+            self.listas_de_reproduccion[nombre_lista] = []  # Crear una lista vacía para la nueva lista de reproducción
             self.crear_botones_listas()  # Actualizar los botones de las listas
-
             self.guardar_listas_de_reproduccion()
 
     def agregar_cancion_a_lista(self):
@@ -205,19 +214,25 @@ class Reproductor:
             # Botón para agregar la canción a la lista seleccionada
             agregar_button = tk.Button(ventana_lista, text="Agregar a Lista", command=lambda: self.agregar_cancion_seleccionada(lista_seleccionada.get()))
             agregar_button.pack()
-
             self.guardar_listas_de_reproduccion()
    
-
     def agregar_cancion_seleccionada(self, lista_seleccionada):
+        
         if self.cancion_actual and lista_seleccionada:
-            lista = self.listas_de_reproduccion.get(lista_seleccionada)
-            if lista:
-                lista.append(self.cancion_actual)
-                print(f"{self.cancion_actual.nombre} agregada a la lista '{lista_seleccionada}'")
-                self.guardar_listas_de_reproduccion()
+            if lista_seleccionada not in self.listas_de_reproduccion:
+                # La lista seleccionada no existe, créala y agregue la canción
+                self.listas_de_reproduccion[lista_seleccionada] = [self.cancion_actual]
+            else:
+                # La lista ya existe, simplemente agregue la canción
+                self.listas_de_reproduccion[lista_seleccionada].append(self.cancion_actual)
+
+            # Actualizar las listas de reproducción en el archivo JSON
+            self.guardar_listas_de_reproduccion()
+
+            print(f"{self.cancion_actual.nombre} agregada a la lista '{lista_seleccionada}'")
 
     def guardar_listas_de_reproduccion(self):
         # Guardar las listas de reproducción en un archivo JSON
         with open("listas_de_reproduccion.json", "w") as archivo:
-            json.dump(self.listas_de_reproduccion, archivo)
+            datos_serializables = {lista: [c.to_dict() for c in canciones] for lista, canciones in self.listas_de_reproduccion.items()}
+            json.dump(datos_serializables, archivo)
